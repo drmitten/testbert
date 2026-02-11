@@ -1,0 +1,38 @@
+name: testbert
+
+services:
+  postgres:
+    build:
+      context: .
+      dockerfile: Dockerfile.postgres
+    environment:
+      POSTGRES_USER: ${TESTBERT_DB_USER:-testy}
+      POSTGRES_PASSWORD: ${TESTBERT_DB_PASSWORD}
+      TESTBERT_DATABASE: ${TESTBERT_DB_NAME:-testbert}
+    restart: unless-stopped
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - ${TESTBERT_DB_PORT:-5433}:5432
+
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      TESTBERT_AUTH_SECRET: ${TESTBERT_AUTH_SECRET}
+      TESTBERT_SERVER_PORT: ${TESTBERT_SERVER_PORT:-50013}
+      TESTBERT_DB_NAME: ${TESTBERT_DB_NAME:-testbert} 
+      TESTBERT_DB_USER: ${TESTBERT_DB_USER:-testy}
+      TESTBERT_DB_PASSWORD: ${TESTBERT_DB_PASSWORD}
+      TESTBERT_DB_HOST: postgres
+      TESTBERT_DB_PORT: 5432
+    restart: unless-stopped
+    ports:
+      - ${TESTBERT_SERVER_PORT:-50013}:50013
+    command: /opt/app/testbert-server
+    depends_on:
+      - postgres
+
+volumes:
+  db_data:

@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package collection;
+
+option go_package = "testbert/protobuf/collection";
+
+service CollectionService {
+  rpc CreateCollection(CreateCollectionRequest) returns (Collection){};
+  rpc GetCollection(GetCollectionRequest) returns (Collection){};
+  rpc UpdateCollection(UpdateCollectionRequest) returns (Collection){};
+  rpc DeleteCollection(DeleteCollectionRequest) returns (google.protobuf.Empty){};
+  rpc CreateShareToken(CreateShareTokenRequest) returns (ShareToken){};
+  rpc GetSharedCollection(GetSharedCollectionRequest) returns (Collection){};
+  rpc RevokeShareToken(RevokeShareTokenRequest) returns (google.protobuf.Empty){};
+}
+
+message Collection {
+  string collection_id = 1;
+  string collection_data = 2;
+  bool org_view = 3;
+  bool org_edit = 4;
+  bool org_share = 5;
+  
+}
+
+message CreateCollectionRequest {
+  string collection_data = 1;
+  bool org_view = 2;
+  bool org_edit = 3;
+  bool org_share = 4;
+}
+
+message GetCollectionRequest {
+  string collection_id = 1;
+}
+
+message UpdateCollectionRequest {
+  string collection_id = 1;
+  string collection_data = 2;
+  bool org_view = 3;
+  bool org_edit = 4;
+  bool org_share = 5;
+}
+
+message DeleteCollectionRequest {
+  string collection_id = 1;
+}
+
+message ShareToken {
+  string collection_id = 1;
+  string token = 2;
+}
+
+message CreateShareTokenRequest {
+  string collection_id = 1;
+}
+
+message GetSharedCollectionRequest {
+  string token = 1;
+}
+
+message RevokeShareTokenRequest {
+  string token = 1;
+}

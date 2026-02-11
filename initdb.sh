@@ -1,0 +1,7 @@
+#!/bin/bash -e
+
+echo "Creating TestBert database"
+psql --username "$POSTGRES_USER" <<-SQL
+  CREATE DATABASE $TESTBERT_DATABASE;
+  GRANT ALL PRIVILEGES ON DATABASE $TESTBERT_DATABASE TO $POSTGRES_USER;
+SQL
