@@ -25,6 +25,9 @@ func TestIntegration(t *testing.T) {
 	cfg := config.NewConfig()
 
 	db := setupDB(cfg)
+	defer func() {
+		_ = db.Close()
+	}()
 
 	// Comment to test an inmemory server
 	//
@@ -35,6 +38,7 @@ func TestIntegration(t *testing.T) {
 	defer func() {
 		_ = conn.Close()
 	}()
+
 	tc := NewClient(collection.NewCollectionServiceClient(conn), cfg.AuthSecret)
 
 	// Uncomment to run against inmemory server (for local dev)

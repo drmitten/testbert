@@ -217,7 +217,6 @@ func (s *collectionServer) UpdateCollection(ctx context.Context, req *collection
 
 func NewCollectionServer(store datastore.TestBertDatastore, key string) collection.CollectionServiceServer {
 	publish := make(chan any, 1000)
-	defer close(publish)
 
 	go func() {
 		for msg := range publish {
