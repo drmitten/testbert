@@ -57,7 +57,7 @@ func main() {
 	}
 	srv := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
 
-	collection.RegisterCollectionServiceServer(srv, server.NewCollectionServer(memstore.NewMemStore(), cfg.AuthSecret))
+	collection.RegisterCollectionServiceServer(srv, server.NewCollectionServer(sqlstore.NewSqlStore(db), cfg.AuthSecret))
 
 	log.Println("listening for connections...")
 
