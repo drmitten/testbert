@@ -232,7 +232,7 @@ func NewCollectionServer(store datastore.TestBertDatastore, key string) collecti
 		cache: otter.Must(&otter.Options[string, int]{
 			ExpiryCalculator: otter.ExpiryCreating[string, int](15 * time.Second),
 		}),
-		publish: make(chan any, 1000),
+		publish: publish,
 	}
 }
 

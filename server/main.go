@@ -38,6 +38,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("unable to connect to to database: %v", err)
 	}
+	defer func() {
+		_ = db.Close()
+	}()
 
 	goose.SetBaseFS(migrations)
 

@@ -32,7 +32,9 @@ func TestIntegration(t *testing.T) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 	tc := NewClient(collection.NewCollectionServiceClient(conn), cfg.AuthSecret)
 
 	// Uncomment to run against inmemory server (for local dev)
