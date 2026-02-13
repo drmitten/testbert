@@ -3,33 +3,30 @@ package server
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"testbert/protobuf/collection"
+	"testbert/server/config"
 	"testbert/server/datastore"
 	"testbert/server/model"
 	"testbert/server/presenters"
 	"testbert/server/tberrors"
 
-	"github.com/golang-jwt/jwt"
 	"github.com/google/uuid"
 	"github.com/maypok86/otter/v2"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type collectionServer struct {
 	collection.UnimplementedCollectionServiceServer
 	store   datastore.TestBertDatastore
-	key     []byte
 	cache   *otter.Cache[string, int]
 	publish chan any
 }
 
 // CreateCollection implements [collection.CollectionServiceServer].
 func (s *collectionServer) CreateCollection(ctx context.Context, req *collection.CreateCollectionRequest) (*collection.Collection, error) {
-	user, org, err := s.getLoggedInUserAndOrg(ctx)
+	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +53,7 @@ func (s *collectionServer) CreateCollection(ctx context.Context, req *collection
 
 // CreateShareToken implements [collection.CollectionServiceServer].
 func (s *collectionServer) CreateShareToken(ctx context.Context, req *collection.CreateShareTokenRequest) (*collection.ShareToken, error) {
-	user, org, err := s.getLoggedInUserAndOrg(ctx)
+	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -83,7 +80,7 @@ func (s *collectionServer) CreateShareToken(ctx context.Context, req *collection
 
 // DeleteCollection implements [collection.CollectionServiceServer].
 func (s *collectionServer) DeleteCollection(ctx context.Context, req *collection.DeleteCollectionRequest) (*emptypb.Empty, error) {
-	user, org, err := s.getLoggedInUserAndOrg(ctx)
+	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +106,7 @@ func (s *collectionServer) DeleteCollection(ctx context.Context, req *collection
 
 // GetCollection implements [collection.CollectionServiceServer].
 func (s *collectionServer) GetCollection(ctx context.Context, req *collection.GetCollectionRequest) (*collection.Collection, error) {
-	user, org, err := s.getLoggedInUserAndOrg(ctx)
+	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -164,7 +161,7 @@ func (s *collectionServer) GetSharedCollection(ctx context.Context, req *collect
 
 // RevokeShareToken implements [collection.CollectionServiceServer].
 func (s *collectionServer) RevokeShareToken(ctx context.Context, req *collection.RevokeShareTokenRequest) (*emptypb.Empty, error) {
-	user, org, err := s.getLoggedInUserAndOrg(ctx)
+	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -185,7 +182,7 @@ func (s *collectionServer) RevokeShareToken(ctx context.Context, req *collection
 }
 
 func (s *collectionServer) UpdateCollection(ctx context.Context, req *collection.UpdateCollectionRequest) (*collection.Collection, error) {
-	user, org, err := s.getLoggedInUserAndOrg(ctx)
+	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +224,6 @@ func NewCollectionServer(store datastore.TestBertDatastore, key string) collecti
 
 	return &collectionServer{
 		store: store,
-		key:   []byte(key),
 		cache: otter.Must(&otter.Options[string, int]{
 			ExpiryCalculator: otter.ExpiryCreating[string, int](15 * time.Second),
 		}),
@@ -235,46 +231,16 @@ func NewCollectionServer(store datastore.TestBertDatastore, key string) collecti
 	}
 }
 
-func (s *collectionServer) getLoggedInUserAndOrg(ctx context.Context) (user, org *uuid.UUID, err error) {
-	md, ok := metadata.FromIncomingContext(ctx)
+func getLoggedInUserAndOrg(ctx context.Context) (*uuid.UUID, *uuid.UUID, error) {
+	user, ok := ctx.Value(config.KeyUserID).(*uuid.UUID)
 	if !ok {
 		return nil, nil, tberrors.ErrUnauthorized
 	}
-
-	auth := md["authorization"]
-	if len(auth) < 1 {
-		return nil, nil, tberrors.ErrUnauthorized
-	}
-
-	tokenString := strings.TrimPrefix(auth[0], "Bearer ")
-
-	token, err := jwt.Parse(tokenString, s.keyFunc)
-	if err != nil {
-		return nil, nil, tberrors.ErrUnauthorized
-	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
+	org, ok := ctx.Value(config.KeyOrgID).(*uuid.UUID)
 	if !ok {
 		return nil, nil, tberrors.ErrUnauthorized
 	}
-
-	userID := uuid.NullUUID{}
-	_ = userID.Scan(claims["user"])
-	if !userID.Valid {
-		return nil, nil, tberrors.ErrUnauthorized
-	}
-
-	orgID := uuid.NullUUID{}
-	_ = orgID.Scan(claims["org"])
-	if !orgID.Valid {
-		return nil, nil, tberrors.ErrUnauthorized
-	}
-
-	return &userID.UUID, &orgID.UUID, nil
-}
-
-func (s *collectionServer) keyFunc(_ *jwt.Token) (any, error) {
-	return s.key, nil
+	return user, org, nil
 }
 
 type AccessEvent struct {

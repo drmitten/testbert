@@ -43,7 +43,7 @@ func TestIntegration(t *testing.T) {
 
 	// Uncomment to run against inmemory server (for local dev)
 	//
-	// tc, closer := newServer(db)
+	// tc, closer := newServer(db, cfg)
 	// defer closer()
 
 	defer func() {

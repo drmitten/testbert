@@ -6,7 +6,9 @@ import (
 	"net"
 
 	"testbert/protobuf/collection"
+	"testbert/server/config"
 	"testbert/server/datastore/sqlstore"
+	"testbert/server/interceptors/auth"
 	"testbert/server/server"
 
 	"github.com/jmoiron/sqlx"
@@ -15,10 +17,12 @@ import (
 	"google.golang.org/grpc/test/bufconn"
 )
 
-func newServer(db *sqlx.DB) (*TestClient, func()) {
+func newServer(db *sqlx.DB, cfg *config.Configuration) (*TestClient, func()) {
 	lis := bufconn.Listen(101024 * 1024)
 
-	grpcSrv := grpc.NewServer()
+	cfg.AuthSecret = "testkey"
+
+	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(auth.Interceptor(cfg)))
 
 	collection.RegisterCollectionServiceServer(grpcSrv, server.NewCollectionServer(sqlstore.NewSqlStore(db), "testkey"))
 	go func() {

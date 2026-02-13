@@ -9,6 +9,7 @@ import (
 	"testbert/protobuf/collection"
 	"testbert/server/config"
 	"testbert/server/datastore/sqlstore"
+	"testbert/server/interceptors/auth"
 	"testbert/server/server"
 
 	"github.com/jmoiron/sqlx"
@@ -58,7 +59,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	srv := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()))
+	srv := grpc.NewServer(grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		grpc.UnaryInterceptor(auth.Interceptor(cfg)))
 
 	collection.RegisterCollectionServiceServer(srv, server.NewCollectionServer(sqlstore.NewSqlStore(db), cfg.AuthSecret))
 
