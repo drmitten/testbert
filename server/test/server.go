@@ -24,7 +24,7 @@ func newServer(db *sqlx.DB, cfg *config.Configuration) (*TestClient, func()) {
 
 	grpcSrv := grpc.NewServer(grpc.UnaryInterceptor(auth.Interceptor(cfg)))
 
-	collection.RegisterCollectionServiceServer(grpcSrv, server.NewCollectionServer(sqlstore.NewSqlStore(db), "testkey"))
+	collection.RegisterCollectionServiceServer(grpcSrv, server.NewCollectionServer(sqlstore.NewSQLStore(db), "testkey"))
 	go func() {
 		if err := grpcSrv.Serve(lis); err != nil {
 			log.Fatal(err)

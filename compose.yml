@@ -1,6 +1,14 @@
 name: testbert
 
 services:
+  jaeger:
+    image: jaegertracing/jaeger
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+    environment:
+      - LOG_LEVEL=debug
+
   postgres:
     build:
       context: .
@@ -27,12 +35,14 @@ services:
       TESTBERT_DB_PASSWORD: ${TESTBERT_DB_PASSWORD}
       TESTBERT_DB_HOST: postgres
       TESTBERT_DB_PORT: 5432
+      TESTBERT_OTLP_ENDPOINT: jaeger
     restart: unless-stopped
     ports:
       - ${TESTBERT_SERVER_PORT:-50013}:50013
     command: /opt/app/testbert-server
     depends_on:
       - postgres
+      - jaeger
 
 volumes:
   db_data:

@@ -8,14 +8,21 @@ import (
 	"testbert/protobuf/collection"
 	"testbert/server/config"
 	"testbert/server/datastore"
+	"testbert/server/interceptors/metrics"
 	"testbert/server/model"
 	"testbert/server/presenters"
 	"testbert/server/tberrors"
 
 	"github.com/google/uuid"
 	"github.com/maypok86/otter/v2"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+var tracer = otel.Tracer("collection-server")
 
 type collectionServer struct {
 	collection.UnimplementedCollectionServiceServer
@@ -26,10 +33,23 @@ type collectionServer struct {
 
 // CreateCollection implements [collection.CollectionServiceServer].
 func (s *collectionServer) CreateCollection(ctx context.Context, req *collection.CreateCollectionRequest) (*collection.Collection, error) {
+	ctx, span := tracer.Start(ctx, "CreateCollection",
+		trace.WithAttributes(
+			attribute.Bool("collection.create", true),
+		))
+	defer span.End()
+
 	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "unauthorized")
 		return nil, err
 	}
+
+	span.SetAttributes(
+		attribute.String("user.id", user.String()),
+		attribute.String("org.id", org.String()),
+	)
 
 	out, err := s.store.CreateCollection(&model.Collection{
 		ID:       uuid.New(),
@@ -39,8 +59,12 @@ func (s *collectionServer) CreateCollection(ctx context.Context, req *collection
 		OrgShare: req.OrgShare,
 	}, user, org)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "create collection failed")
 		return nil, err
 	}
+
+	span.SetAttributes(attribute.String("collection.id", out.ID.String()))
 
 	s.publish <- &AccessEvent{
 		CollectionID: string(out.ID.String()),
@@ -53,20 +77,39 @@ func (s *collectionServer) CreateCollection(ctx context.Context, req *collection
 
 // CreateShareToken implements [collection.CollectionServiceServer].
 func (s *collectionServer) CreateShareToken(ctx context.Context, req *collection.CreateShareTokenRequest) (*collection.ShareToken, error) {
+	ctx, span := tracer.Start(ctx, "CreateShareToken",
+		trace.WithAttributes(
+			attribute.String("collection.id", req.CollectionId),
+		))
+	defer span.End()
+
 	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "unauthorized")
 		return nil, err
 	}
 
+	span.SetAttributes(
+		attribute.String("user.id", user.String()),
+		attribute.String("org.id", org.String()),
+	)
+
 	id, err := uuid.Parse(req.CollectionId)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid collection id")
 		return nil, tberrors.ErrCollectionNotFound
 	}
 
 	out, err := s.store.CreateSharingToken(&id, user, org)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "create share token failed")
 		return nil, err
 	}
+
+	span.SetAttributes(attribute.String("share.token", out.Token))
 
 	s.publish <- &AccessEvent{
 		SharedToken:  out.Token,
@@ -80,18 +123,35 @@ func (s *collectionServer) CreateShareToken(ctx context.Context, req *collection
 
 // DeleteCollection implements [collection.CollectionServiceServer].
 func (s *collectionServer) DeleteCollection(ctx context.Context, req *collection.DeleteCollectionRequest) (*emptypb.Empty, error) {
+	ctx, span := tracer.Start(ctx, "DeleteCollection",
+		trace.WithAttributes(
+			attribute.String("collection.id", req.CollectionId),
+		))
+	defer span.End()
+
 	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "unauthorized")
 		return nil, err
 	}
 
+	span.SetAttributes(
+		attribute.String("user.id", user.String()),
+		attribute.String("org.id", org.String()),
+	)
+
 	id, err := uuid.Parse(req.CollectionId)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid collection id")
 		return nil, tberrors.ErrCollectionNotFound
 	}
 
 	err = s.store.DeleteCollection(&id, user, org)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "delete collection failed")
 		return nil, err
 	}
 
@@ -106,18 +166,35 @@ func (s *collectionServer) DeleteCollection(ctx context.Context, req *collection
 
 // GetCollection implements [collection.CollectionServiceServer].
 func (s *collectionServer) GetCollection(ctx context.Context, req *collection.GetCollectionRequest) (*collection.Collection, error) {
+	ctx, span := tracer.Start(ctx, "GetCollection",
+		trace.WithAttributes(
+			attribute.String("collection.id", req.CollectionId),
+		))
+	defer span.End()
+
 	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "unauthorized")
 		return nil, err
 	}
 
+	span.SetAttributes(
+		attribute.String("user.id", user.String()),
+		attribute.String("org.id", org.String()),
+	)
+
 	id, err := uuid.Parse(req.CollectionId)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid collection id")
 		return nil, tberrors.ErrCollectionNotFound
 	}
 
 	out, err := s.store.GetCollection(&id, user, org)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "get collection failed")
 		return nil, err
 	}
 
@@ -132,6 +209,12 @@ func (s *collectionServer) GetCollection(ctx context.Context, req *collection.Ge
 
 // GetSharedCollection implements [collection.CollectionServiceServer].
 func (s *collectionServer) GetSharedCollection(ctx context.Context, req *collection.GetSharedCollectionRequest) (*collection.Collection, error) {
+	ctx, span := tracer.Start(ctx, "GetSharedCollection",
+		trace.WithAttributes(
+			attribute.String("share.token", req.Token),
+		))
+	defer span.End()
+
 	count, _ := s.cache.Compute(req.Token, func(oldValue int, _ bool) (int, otter.ComputeOp) {
 		if oldValue <= 250 {
 			return oldValue + 1, otter.WriteOp
@@ -141,13 +224,20 @@ func (s *collectionServer) GetSharedCollection(ctx context.Context, req *collect
 	})
 
 	if count > 250 {
+		span.SetAttributes(attribute.Bool("rate.limited", true))
+		span.SetStatus(codes.Error, "rate limited")
+		metrics.RateLimitedCount.Add(ctx, 1)
 		return nil, tberrors.ErrRateLimited
 	}
 
 	out, err := s.store.GetCollectionFromSharingToken(req.Token)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "get shared collection failed")
 		return nil, err
 	}
+
+	span.SetAttributes(attribute.String("collection.id", out.ID.String()))
 
 	s.publish <- &AccessEvent{
 		SharedToken:  req.Token,
@@ -161,13 +251,28 @@ func (s *collectionServer) GetSharedCollection(ctx context.Context, req *collect
 
 // RevokeShareToken implements [collection.CollectionServiceServer].
 func (s *collectionServer) RevokeShareToken(ctx context.Context, req *collection.RevokeShareTokenRequest) (*emptypb.Empty, error) {
+	ctx, span := tracer.Start(ctx, "RevokeShareToken",
+		trace.WithAttributes(
+			attribute.String("share.token", req.Token),
+		))
+	defer span.End()
+
 	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "unauthorized")
 		return nil, err
 	}
 
+	span.SetAttributes(
+		attribute.String("user.id", user.String()),
+		attribute.String("org.id", org.String()),
+	)
+
 	err = s.store.DeleteSharingToken(req.Token, user, org)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "revoke share token failed")
 		return nil, err
 	}
 
@@ -182,13 +287,28 @@ func (s *collectionServer) RevokeShareToken(ctx context.Context, req *collection
 }
 
 func (s *collectionServer) UpdateCollection(ctx context.Context, req *collection.UpdateCollectionRequest) (*collection.Collection, error) {
+	ctx, span := tracer.Start(ctx, "UpdateCollection",
+		trace.WithAttributes(
+			attribute.String("collection.id", req.CollectionId),
+		))
+	defer span.End()
+
 	user, org, err := getLoggedInUserAndOrg(ctx)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "unauthorized")
 		return nil, err
 	}
 
+	span.SetAttributes(
+		attribute.String("user.id", user.String()),
+		attribute.String("org.id", org.String()),
+	)
+
 	id, err := uuid.Parse(req.CollectionId)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "invalid collection id")
 		return nil, tberrors.ErrCollectionNotFound
 	}
 
@@ -200,6 +320,8 @@ func (s *collectionServer) UpdateCollection(ctx context.Context, req *collection
 		OrgShare: req.OrgShare,
 	}, user, org)
 	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "update collection failed")
 		return nil, err
 	}
 

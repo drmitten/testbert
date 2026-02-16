@@ -11,7 +11,7 @@ type sqlStore struct {
 	db *sqlx.DB
 }
 
-func NewSqlStore(db *sqlx.DB) datastore.TestBertDatastore {
+func NewSQLStore(db *sqlx.DB) datastore.TestBertDatastore {
 	return &sqlStore{
 		db: db,
 	}
