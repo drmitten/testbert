@@ -318,6 +318,8 @@ func (s *collectionServer) UpdateCollection(ctx context.Context, req *collection
 		OrgView:  req.OrgView,
 		OrgEdit:  req.OrgEdit,
 		OrgShare: req.OrgShare,
+		UserID:   *user,
+		OrgID:    *org,
 	}, user, org)
 	if err != nil {
 		span.RecordError(err)
